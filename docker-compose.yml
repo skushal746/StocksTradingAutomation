@@ -1,0 +1,46 @@
+# Postgres + application. Usage:
+#   cp .env.example .env          # fill in Kite / LLM keys
+#   docker compose up -d --build  # starts Postgres, creates tables, keeps app container ready
+#   docker compose exec app python main.py run-premarket
+#   docker compose exec app python main.py run-live
+#   docker compose down           # stop (add -v to also delete the database volume)
+
+name: stocks-trading
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader}
+      POSTGRES_DB: trading
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d trading"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    # Overrides .env so the app reaches Postgres over the compose network.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://trader:${POSTGRES_PASSWORD:-trader}@db:5432/trading
+    volumes:
+      - ./logs:/app/logs
+    # Create tables once the DB is healthy, then stay idle so you can exec commands into it.
+    command: sh -c "python main.py init-db && tail -f /dev/null"
+
+volumes:
+  pgdata:

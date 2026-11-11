@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stocks-trading-automation"
+version = "0.1.0"
+description = "Modular-monolith intraday trading prototype: pre-market news -> LLM watchlist -> ORB execution via Zerodha Kite Connect."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "feedparser>=6.0.11",
+    "kiteconnect>=5.0.1",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "openai>=1.40",
+    "anthropic>=0.40",
+    "loguru>=0.7.2",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+py-modules = ["main", "config", "schemas"]
+packages = ["core", "ingestion", "analysis", "execution", "db"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
