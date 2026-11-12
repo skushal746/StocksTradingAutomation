@@ -34,7 +34,8 @@ from execution.engine import TradingEngine
 from execution.order_router import KiteOrderRouter, OrderRouter, PaperOrderRouter
 from execution.orb_strategy import ORBStrategy
 from execution.risk_manager import RiskManager
-from ingestion.news_scraper import NewsScraper
+from ingestion.news_scraper import NewsScraper, dedupe_items
+from ingestion.newsdata_client import fetch_newsdata
 from ingestion.tick_listener import TickListener
 from schemas import Bias, NewsItem
 
@@ -76,6 +77,21 @@ def _event_to_item(event: NewsEvent) -> NewsItem:
 async def _ingest_news(settings: Settings, sf: async_sessionmaker) -> tuple[int, int]:
     async with NewsScraper(settings.feed_urls, timeout=settings.news_request_timeout_seconds) as scraper:
         items = await scraper.fetch_all()
+    if settings.newsdata_api_key.get_secret_value():
+        try:
+            items.extend(
+                await fetch_newsdata(
+                    settings.newsdata_api_key.get_secret_value(),
+                    query=settings.newsdata_query,
+                    country=settings.newsdata_country,
+                    language=settings.newsdata_language,
+                    size=settings.newsdata_size,
+                    timeout=settings.news_request_timeout_seconds,
+                )
+            )
+        except Exception as exc:  # the RSS feeds must still run if NewsData is down or out of credits
+            logger.error("newsdata.failed", error=repr(exc))
+        items = dedupe_items(items)
     inserted = 0
     async with sf() as session, session.begin():
         for start in range(0, len(items), 500):

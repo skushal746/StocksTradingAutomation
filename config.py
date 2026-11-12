@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     news_request_timeout_seconds: float = Field(default=10.0, gt=0)
     news_lookback_hours: int = Field(default=18, ge=1, le=96)
 
+    # --- NewsData.io (optional; free plan: 200 credits/day, 1-10 articles per credit, 12h delay, 48h history)
+    newsdata_api_key: SecretStr = SecretStr("")
+    newsdata_query: str = ""
+    newsdata_country: str = "in"
+    newsdata_language: str = "en"
+    newsdata_size: int = Field(default=10, ge=1, le=10)
+
     # --- Watchlist
     watchlist_size: int = Field(default=5, ge=1, le=20)
     premarket_cutoff: time = time(8, 45)
