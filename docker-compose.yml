@@ -2,6 +2,7 @@
 #   cp .env.example .env          # fill in Kite / LLM / news API keys
 #   docker compose up -d --build  # starts Postgres, creates tables, starts the server (scheduler included)
 #   curl http://localhost:8000/health
+#   open http://localhost:8080     # web app (log in or register)
 #   docker compose exec app python main.py run-premarket   # manual run still works
 #   docker compose exec app python main.py run-live
 #   docker compose logs -f app    # watch scheduled news scrapes
@@ -44,13 +45,23 @@ services:
     volumes:
       - ./logs:/app/logs
     # Create tables once the DB is healthy, then run the server. The scheduler starts with it.
-    command: sh -c "python main.py init-db && uvicorn server:app --host 0.0.0.0 --port 8000"
+    # --no-access-log stops the 30-second health check from flooding the logs. App logs still appear.
+    command: sh -c "python main.py init-db && uvicorn server:app --host 0.0.0.0 --port 8000 --no-access-log"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
 
 volumes:
   pgdata:

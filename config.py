@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     news_scrape_start_hour: int = Field(default=4, ge=0, le=23)
     news_scrape_end_hour: int = Field(default=9, ge=0, le=23)
 
+    # --- Authentication. JWT_SECRET_KEY must be at least 32 characters; login is refused without it.
+    jwt_secret_key: SecretStr = SecretStr("")
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = Field(default=480, ge=5, le=10080)
+    registration_enabled: bool = True
+
     # --- NewsData.io (optional; free plan: 200 credits/day, 1-10 articles per credit, 12h delay, 48h history)
     newsdata_api_key: SecretStr = SecretStr("")
     newsdata_query: str = ""

@@ -21,8 +21,11 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from loguru import logger
 
+from api.data_routes import router as data_router
+from auth.routes import router as auth_router
 from config import MARKET_TZ, Settings, get_settings
 from core.logging_setup import configure_logging
+from db.session import create_db_engine, create_session_factory
 from main import _ingest_news, _open_db
 
 SCRAPE_JOB_ID = "news_scrape"
@@ -58,6 +61,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level, settings.log_dir)
 
+    engine = create_db_engine(settings.database_url)
+    app.state.session_factory = create_session_factory(engine)
+
     scheduler = AsyncIOScheduler(timezone=MARKET_TZ)
     if settings.scheduler_enabled:
         scheduler.add_job(
@@ -81,10 +87,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if scheduler.running:
             scheduler.shutdown(wait=False)
+        await engine.dispose()
         logger.info("server.stopped")
 
 
 app = FastAPI(title="Stocks Trading Automation", lifespan=lifespan)
+app.include_router(auth_router)
+app.include_router(data_router)
 
 
 @app.get("/health")

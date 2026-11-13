@@ -9,8 +9,24 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import NewsEvent, TradeLog, WatchlistHistory
+from db.models import NewsEvent, TradeLog, User, WatchlistHistory
 from schemas import LLMAnalysis, NewsItem, OrderResult, TradeStatus, TradeUpdate, WatchlistEntry
+
+
+# ---------------------------------------------------------------- users
+async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
+    return await session.scalar(select(User).where(User.email == email))
+
+
+async def get_user_by_id(session: AsyncSession, user_id: int) -> User | None:
+    return await session.get(User, user_id)
+
+
+async def create_user(session: AsyncSession, email: str, password_hash: str) -> User:
+    user = User(email=email, password_hash=password_hash)
+    session.add(user)
+    await session.flush()  # assigns the id; the caller's transaction commits it
+    return user
 
 
 # ---------------------------------------------------------------- news_events
@@ -105,6 +121,14 @@ async def load_watchlist(session: AsyncSession, trade_date: date) -> list[Watchl
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def list_news(session: AsyncSession, *, limit: int, material_only: bool) -> list[NewsEvent]:
+    """Most recent headlines first. ``material_only`` keeps only LLM-flagged catalysts."""
+    stmt = select(NewsEvent).order_by(NewsEvent.timestamp.desc()).limit(limit)
+    if material_only:
+        stmt = stmt.where(NewsEvent.is_material.is_(True))
+    return list((await session.execute(stmt)).scalars().all())
+
+
 # ---------------------------------------------------------------- trade_logs
 async def create_trade(session: AsyncSession, *, trade_date: date, order: OrderResult, signal_reason: str) -> None:
     session.add(
@@ -138,6 +162,11 @@ async def apply_trade_update(session: AsyncSession, update_: TradeUpdate, *, clo
     if update_.status in (TradeStatus.CLOSED, TradeStatus.CANCELLED, TradeStatus.REJECTED):
         values["closed_at"] = closed_at
     await session.execute(update(TradeLog).where(TradeLog.order_id == update_.order_id).values(**values))
+
+
+async def list_trades(session: AsyncSession, trade_date: date) -> list[TradeLog]:
+    stmt = select(TradeLog).where(TradeLog.trade_date == trade_date).order_by(TradeLog.id)
+    return list((await session.execute(stmt)).scalars().all())
 
 
 async def realised_pnl_for_day(session: AsyncSession, trade_date: date, mode: str) -> float:
