@@ -35,6 +35,7 @@ from execution.order_router import KiteOrderRouter, OrderRouter, PaperOrderRoute
 from execution.orb_strategy import ORBStrategy
 from execution.risk_manager import RiskManager
 from ingestion.news_scraper import NewsScraper, dedupe_items
+from ingestion.currentsapi_client import fetch_currentsapi
 from ingestion.newsdata_client import fetch_newsdata
 from ingestion.tick_listener import TickListener
 from schemas import Bias, NewsItem
@@ -91,7 +92,22 @@ async def _ingest_news(settings: Settings, sf: async_sessionmaker) -> tuple[int,
             )
         except Exception as exc:  # the RSS feeds must still run if NewsData is down or out of credits
             logger.error("newsdata.failed", error=repr(exc))
-        items = dedupe_items(items)
+    if settings.currentsapi_api_key.get_secret_value():
+        try:
+            items.extend(
+                await fetch_currentsapi(
+                    settings.currentsapi_api_key.get_secret_value(),
+                    language=settings.currentsapi_language,
+                    country=settings.currentsapi_country,
+                    category=settings.currentsapi_category,
+                    page_size=settings.currentsapi_page_size,
+                    max_pages=settings.currentsapi_max_pages,
+                    timeout=settings.news_request_timeout_seconds,
+                )
+            )
+        except Exception as exc:  # the other sources must still run if CurrentsAPI is down or over quota
+            logger.error("currentsapi.failed", error=repr(exc))
+    items = dedupe_items(items)
     inserted = 0
     async with sf() as session, session.begin():
         for start in range(0, len(items), 500):

@@ -111,6 +111,14 @@ class Settings(BaseSettings):
     newsdata_language: str = "en"
     newsdata_size: int = Field(default=10, ge=1, le=10)
 
+    # --- CurrentsAPI (optional; free plan: 250 requests/day, 20 articles per request, 300-char descriptions)
+    currentsapi_api_key: SecretStr = SecretStr("")
+    currentsapi_language: str = "en"
+    currentsapi_country: str = ""
+    currentsapi_category: str = ""
+    currentsapi_page_size: int = Field(default=20, ge=1, le=200)
+    currentsapi_max_pages: int = Field(default=1, ge=1, le=10)
+
     # --- Watchlist
     watchlist_size: int = Field(default=5, ge=1, le=20)
     premarket_cutoff: time = time(8, 45)
