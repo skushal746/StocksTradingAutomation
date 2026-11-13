@@ -1,8 +1,10 @@
-# Postgres + application. Usage:
-#   cp .env.example .env          # fill in Kite / LLM keys
-#   docker compose up -d --build  # starts Postgres, creates tables, keeps app container ready
-#   docker compose exec app python main.py run-premarket
+# Postgres + application server. Usage:
+#   cp .env.example .env          # fill in Kite / LLM / news API keys
+#   docker compose up -d --build  # starts Postgres, creates tables, starts the server (scheduler included)
+#   curl http://localhost:8000/health
+#   docker compose exec app python main.py run-premarket   # manual run still works
 #   docker compose exec app python main.py run-live
+#   docker compose logs -f app    # watch scheduled news scrapes
 #   docker compose down           # stop (add -v to also delete the database volume)
 
 name: stocks-trading
@@ -37,10 +39,18 @@ services:
     # Overrides .env so the app reaches Postgres over the compose network.
     environment:
       DATABASE_URL: postgresql+asyncpg://trader:${POSTGRES_PASSWORD:-trader}@db:5432/trading
+    ports:
+      - "${APP_PORT:-8000}:8000"
     volumes:
       - ./logs:/app/logs
-    # Create tables once the DB is healthy, then stay idle so you can exec commands into it.
-    command: sh -c "python main.py init-db && tail -f /dev/null"
+    # Create tables once the DB is healthy, then run the server. The scheduler starts with it.
+    command: sh -c "python main.py init-db && uvicorn server:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   pgdata:

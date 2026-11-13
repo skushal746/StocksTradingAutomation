@@ -9,3 +9,6 @@ loguru>=0.7.2
 pydantic>=2.7
 pydantic-settings>=2.3
 typer>=0.12
+fastapi>=0.115
+uvicorn>=0.30
+apscheduler>=3.10,<4

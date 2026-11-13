@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     news_feed_urls: str = ",".join(DEFAULT_NEWS_FEEDS)
     news_request_timeout_seconds: float = Field(default=10.0, gt=0)
     news_lookback_hours: int = Field(default=18, ge=1, le=96)
+    # Server mode: news is scraped every hour from start hour to end hour (inclusive), IST.
+    scheduler_enabled: bool = True
+    news_scrape_start_hour: int = Field(default=4, ge=0, le=23)
+    news_scrape_end_hour: int = Field(default=9, ge=0, le=23)
 
     # --- NewsData.io (optional; free plan: 200 credits/day, 1-10 articles per credit, 12h delay, 48h history)
     newsdata_api_key: SecretStr = SecretStr("")
